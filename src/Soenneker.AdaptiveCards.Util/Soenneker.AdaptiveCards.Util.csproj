@@ -43,13 +43,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
-    </ItemGroup>
-    <ItemGroup Condition="Exists('..\..\..\soenneker.adaptivecards.dtos\src\Soenneker.AdaptiveCards.Dtos\Soenneker.AdaptiveCards.Dtos.csproj')">
-        <ProjectReference Include="..\..\..\soenneker.adaptivecards.dtos\src\Soenneker.AdaptiveCards.Dtos\Soenneker.AdaptiveCards.Dtos.csproj" />
-    </ItemGroup>
-    <ItemGroup Condition="!Exists('..\..\..\soenneker.adaptivecards.dtos\src\Soenneker.AdaptiveCards.Dtos\Soenneker.AdaptiveCards.Dtos.csproj')">
-        <PackageReference Include="Soenneker.AdaptiveCards.Dtos" Version="4.0.0" />
+        <PackageReference Include="Soenneker.AdaptiveCards.Dtos" Version="4.0.1" />
+        <PackageReference Include="Soenneker.Utils.Json" Version="4.0.2714" />
     </ItemGroup>
 </Project>
-

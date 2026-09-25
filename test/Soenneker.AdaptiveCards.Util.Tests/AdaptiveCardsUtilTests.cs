@@ -24,6 +24,9 @@ public sealed class AdaptiveCardsUtilTests
         AdaptiveCard card = util.Deserialize(json);
         if (card.Body.Value[0].AsVariant3().Items[1].AsVariant10().Id != "name" || !card.Body.Value[0].AsVariant3().Items[1].AsVariant10().IsRequired.Value)
             throw new Exception("Nested elements and inherited input properties were not typed correctly.");
+        string indented = util.Serialize(card, writeIndented: true);
+        if (!indented.Contains('\n') || !JsonNode.DeepEquals(JsonNode.Parse(json), JsonNode.Parse(util.Serialize(util.Deserialize(indented)))))
+            throw new Exception("Indented card JSON changed during the round trip.");
         if (!JsonNode.DeepEquals(JsonNode.Parse(json), JsonNode.Parse(util.Serialize(card))))
             throw new Exception("Card JSON changed during the round trip.");
     }
@@ -32,7 +35,7 @@ public sealed class AdaptiveCardsUtilTests
     public void BuildUsesWireNamesAndPreservesFalse()
     {
         var util = new AdaptiveCardsUtil();
-        AdaptiveCard card = util.Build("Heading", "Summary", new Dictionary<string, string?> { ["Name"] = null });
+        AdaptiveCard card = util.Build("Heading", "Summary", new Dictionary<string, string?> { ["Name"] = "Ada", ["Empty"] = "", ["Missing"] = null });
         card.Body.Value[0].AsVariant16().Wrap = false;
         string json = util.Serialize(card);
         using JsonDocument document = JsonDocument.Parse(json);
@@ -61,5 +64,58 @@ public sealed class AdaptiveCardsUtilTests
             throw new Exception("Invalid card was accepted: " + json);
         }
     }
-}
+    [Test]
+    public void TableUsesExplicitSelectorsAndRetainsEmptyHeaders()
+    {
+        var util = new AdaptiveCardsUtil();
+        AdaptiveCardColumn<(string Name, int Count)>[] columns =
+        [
+            new("Total", row => row.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            new("Label", row => row.Name),
+            new("Empty", _ => null)
+        ];
+        AdaptiveCard card = util.BuildTable("Report", new[] { ("Ada", 42) }, columns, "Summary");
+        using JsonDocument document = JsonDocument.Parse(util.Serialize(card));
+        JsonElement root = document.RootElement;
+        JsonElement body = root.GetProperty("body");
+        if (root.GetProperty("msteams").GetProperty("width").GetString() != "Full" || root.GetProperty("version").GetString() != "1.2")
+            throw new Exception("Teams settings are missing.");
+        JsonElement headers = body[2].GetProperty("columns");
+        JsonElement cells = body[3].GetProperty("columns");
+        if (headers[0].GetProperty("items")[0].GetProperty("text").GetString() != "Total"
+            || cells[0].GetProperty("items")[0].GetProperty("text").GetString() != "42"
+            || cells[1].GetProperty("items")[0].GetProperty("text").GetString() != "Ada"
+            || cells[2].GetProperty("items")[0].GetProperty("text").GetString() != "")
+            throw new Exception("Explicit column ordering or cell formatting was lost.");
 
+        AdaptiveCard empty = util.BuildTable("Empty", Array.Empty<(string, int)>(), columns);
+        if (empty.Body.Value[0].AsVariant16().Text != "Empty" || empty.Body.Value[1].AsVariant2().Columns.Value.Count != 3)
+            throw new Exception("Empty table lost its heading or columns.");
+    }
+
+    [Test]
+    public void BuildIncludesExceptionAndTruncatesWithoutSplittingSurrogates()
+    {
+        var util = new AdaptiveCardsUtil();
+        string large = new string('a', 4999) + "😀" + new string('界', 10000);
+        AdaptiveCard card = util.Build("Failure", exception: new InvalidOperationException("Details"), additionalBody: large);
+        using JsonDocument document = JsonDocument.Parse(util.Serialize(card));
+        JsonElement body = document.RootElement.GetProperty("body");
+        if (!body[1].GetProperty("text").GetString()!.Contains("Details") || body[2].GetProperty("text").GetString() != new string('a', 4999))
+            throw new Exception("Exception text or Unicode truncation was incorrect.");
+        if (body[3].GetProperty("text").GetString() != Environment.MachineName || !body[3].GetProperty("isSubtle").GetBoolean())
+            throw new Exception("Diagnostic footer is missing.");
+        string timestamp = body[4].GetProperty("text").GetString()!;
+        if (!timestamp.EndsWith(" EST") && !timestamp.EndsWith(" EDT"))
+            throw new Exception("Timestamp is not labeled with Eastern time.");
+    }
+
+    [Test]
+    public void TableRejectsMissingColumns()
+    {
+        var util = new AdaptiveCardsUtil();
+        try { util.BuildTable("Report", Array.Empty<int>(), Array.Empty<AdaptiveCardColumn<int>>()); }
+        catch (ArgumentException) { return; }
+        throw new Exception("A table without columns was accepted.");
+    }
+}
