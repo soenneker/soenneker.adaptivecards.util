@@ -48,6 +48,6 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
         <PackageReference Include="Soenneker.AdaptiveCards.Dtos" Version="4.0.2" />
-        <PackageReference Include="Soenneker.Utils.Json" Version="4.0.2725" />
+        <PackageReference Include="Soenneker.Utils.Json" Version="4.0.2727" />
     </ItemGroup>
 </Project>
